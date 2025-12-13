@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>ShieldPi - Configurar Almacenamiento</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container" style="width: 500px;">
+        <svg class="logo-icon-large" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+            <path fill="#00e676" d="M256 0c4.6 0 9.2 1 13.4 2.9L457.8 82.8c22 9.3 38.4 31 38.3 57.2-.5 99.2-41.3 280.7-213.6 363.2-16.7 8-36.1 8-52.8 0-172.4-82.5-213.1-264-213.6-363.2-.1-26.2 16.3-47.9 38.3-57.2L242.7 2.9C246.9 1 251.4 0 256 0zm0 66.8l0 378.1c138-66.8 175.1-214.8 176-303.4l-176-74.6 0 0z"/>
+        </svg>
+        
+        <h1>Inicializar Bóveda</h1>
+        <p style="color: #aaa; margin-bottom: 20px;">
+            Selecciona dónde se guardarán físicamente tus copias de seguridad (Ej: Disco USB).
+        </p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert">{{ messages[0] }}</div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/repo/create">
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="color: #00e676;">Ruta del Almacenamiento</label>
+                <div style="display: flex;">
+                    <input type="text" id="repoPathInput" name="path" value="/host/backups" required readonly>
+                    <button type="button" onclick="openBrowser('repoPathInput')" style="width: 60px; margin: 10px 0 10px 5px;"><i class="fas fa-folder-open"></i></button>
+                </div>
+            </div>
+
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="color: #00e676;">Contraseña de Seguridad</label>
+                <input type="password" name="repo_password" placeholder="Define una clave maestra" required>
+            </div>
+
+            <button type="submit">Inicializar Backup</button>
+        </form>
+        
+        <br>
+        <a href="/" class="logout-link">Volver al inicio</a>
+    </div>
+
+    <div id="fileModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Seleccionar Carpeta</h3>
+            <div style="margin-bottom: 10px;">
+                <button type="button" id="btnUp" onclick="goUp()" style="width:auto; padding: 5px 10px;"><i class="fas fa-level-up-alt"></i> Subir Nivel</button>
+                <span id="currentPathDisplay" style="margin-left: 10px; color: #888;"></span>
+            </div>
+            <ul id="fileList" class="browser-list"></ul>
+            <div style="text-align: right; margin-top: 10px;">
+                <button type="button" onclick="closeBrowser()" style="width: auto; background: #555;">Cancelar</button>
+                <button type="button" onclick="selectCurrentFolder()" style="width: auto;">Seleccionar Esta</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTargetInput = null;
+        let currentPath = '/host';
+        function openBrowser(inputId) { currentTargetInput = document.getElementById(inputId); document.getElementById('fileModal').style.display = 'block'; loadPath(currentPath); }
+        function closeBrowser() { document.getElementById('fileModal').style.display = 'none'; }
+        function loadPath(path) {
+            fetch('/api/browse', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({path: path}) })
+            .then(r => r.json()).then(data => {
+                currentPath = data.current; document.getElementById('currentPathDisplay').textContent = currentPath;
+                const list = document.getElementById('fileList'); list.innerHTML = '';
+                document.getElementById('btnUp').onclick = () => loadPath(data.parent);
+                data.items.forEach(item => { let li = document.createElement('li'); li.className = 'browser-item'; li.innerHTML = `<i class="fas fa-folder browser-icon"></i> ${item.name}`; li.onclick = () => loadPath(item.path); list.appendChild(li); });
+            });
+        }
+        function selectCurrentFolder() { if(currentTargetInput) currentTargetInput.value = currentPath; closeBrowser(); }
+    </script>
+</body>
+</html>

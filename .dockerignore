@@ -1,0 +1,14 @@
+# Ignorar configuraciones y bases de datos locales
+app/config/*
+app/config/shieldpi.db
+app/config/repository.config
+
+# Ignorar archivos temporales de Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Ignorar archivos de sistema y logs
+.DS_Store
+*.log

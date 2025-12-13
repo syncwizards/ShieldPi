@@ -1,0 +1,17 @@
+# Ignorar base de datos y configuraciones vivas
+app/config/*.db
+app/config/*.config
+app/config/*.json
+
+# Ignorar carpetas de cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignorar archivos del sistema y logs
+.DS_Store
+*.log
+
+# Ignorar carpetas de datos locales si existen
+shieldpi_data/
+backups/
