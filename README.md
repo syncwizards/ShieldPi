@@ -28,7 +28,7 @@ services:
     ports:
       - 51515:51515
     environment:
-      - TZ=America/Santo_Domingo  # Adjust to your Timezone
+      - TZ=  # Adjust to your Timezone
     volumes:
       # Settings and Database
       - ./shieldpi_data:/app/config
@@ -53,4 +53,5 @@ Requirements
 Contribute
 This project is open source. Suggestions and improvements are welcome!
 ________________________________________
+
 Developed by SyncWizards for the Self-Hosted community.
