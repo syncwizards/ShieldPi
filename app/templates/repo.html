@@ -2,21 +2,37 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>ShieldPi - Configurar Almacenamiento</title>
+    <title>ShieldPi - Setup</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .tabs { display: flex; border-bottom: 2px solid #444; margin-bottom: 20px; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: #888; font-weight: bold; background: #222; }
+        .tab.active { border-bottom: 3px solid #00e676; color: white; background: #2a2a2a; }
+        .tab.rescue { border-bottom-color: #ff3d00; } 
+        .tab.rescue.active { border-bottom: 3px solid #ff3d00; color: #ff3d00; }
+        
+        /* Loading Overlay */
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .spinner { border: 5px solid #333; border-top: 5px solid #ff3d00; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-    <div class="container" style="width: 500px;">
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div style="color:white; font-size:1.5em; font-weight:bold;">RESCATANDO DATOS...</div>
+        <div style="color:#aaa; margin-top:10px;">Analizando estructura y restaurando en ubicación original.</div>
+        <div style="color:#666; font-size:0.8em; margin-top:5px;">No cierres esta ventana.</div>
+    </div>
+
+    <div class="container" style="width: 550px;">
         <svg class="logo-icon-large" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
             <path fill="#00e676" d="M256 0c4.6 0 9.2 1 13.4 2.9L457.8 82.8c22 9.3 38.4 31 38.3 57.2-.5 99.2-41.3 280.7-213.6 363.2-16.7 8-36.1 8-52.8 0-172.4-82.5-213.1-264-213.6-363.2-.1-26.2 16.3-47.9 38.3-57.2L242.7 2.9C246.9 1 251.4 0 256 0zm0 66.8l0 378.1c138-66.8 175.1-214.8 176-303.4l-176-74.6 0 0z"/>
         </svg>
         
-        <h1>Inicializar Bóveda</h1>
-        <p style="color: #aaa; margin-bottom: 20px;">
-            Selecciona dónde se guardarán físicamente tus copias de seguridad (Ej: Disco USB).
-        </p>
+        <h1>Bienvenido a ShieldPi</h1>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -24,57 +40,106 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="/repo/create">
-            <div style="text-align: left; margin-bottom: 15px;">
-                <label style="color: #00e676;">Ruta del Almacenamiento</label>
-                <div style="display: flex;">
-                    <input type="text" id="repoPathInput" name="path" value="/host/backups" required readonly>
-                    <button type="button" onclick="openBrowser('repoPathInput')" style="width: 60px; margin: 10px 0 10px 5px;"><i class="fas fa-folder-open"></i></button>
-                </div>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('normal')" id="tabNormal">
+                <i class="fas fa-plus-circle"></i> Nueva Instalación
             </div>
-
-            <div style="text-align: left; margin-bottom: 15px;">
-                <label style="color: #00e676;">Contraseña de Seguridad</label>
-                <input type="password" name="repo_password" placeholder="Define una clave maestra" required>
-            </div>
-
-            <button type="submit">Inicializar Backup</button>
-        </form>
-        
-        <br>
-        <a href="/" class="logout-link">Volver al inicio</a>
-    </div>
-
-    <div id="fileModal" class="modal">
-        <div class="modal-content">
-            <h3 style="margin-top:0;">Seleccionar Carpeta</h3>
-            <div style="margin-bottom: 10px;">
-                <button type="button" id="btnUp" onclick="goUp()" style="width:auto; padding: 5px 10px;"><i class="fas fa-level-up-alt"></i> Subir Nivel</button>
-                <span id="currentPathDisplay" style="margin-left: 10px; color: #888;"></span>
-            </div>
-            <ul id="fileList" class="browser-list"></ul>
-            <div style="text-align: right; margin-top: 10px;">
-                <button type="button" onclick="closeBrowser()" style="width: auto; background: #555;">Cancelar</button>
-                <button type="button" onclick="selectCurrentFolder()" style="width: auto;">Seleccionar Esta</button>
+            <div class="tab rescue" onclick="switchTab('rescue')" id="tabRescue">
+                <i class="fas fa-ambulance"></i> RESCATAR DATOS
             </div>
         </div>
+
+        <div id="formNormal">
+            <p style="color: #aaa; margin-bottom: 20px;">Configura un repositorio nuevo o conecta uno existente.</p>
+            <form method="POST" action="/repo/create">
+                <div style="text-align: left; margin-bottom: 15px;">
+                    <label style="color: #00e676;">Tipo</label>
+                    <select name="provider" id="providerSelect" onchange="toggleProvider()" style="width: 100%; padding: 10px; background: #333; color: white; border: 1px solid #444;">
+                        <option value="filesystem">Disco Local / USB</option>
+                        <option value="s3">Nube S3 (Solo Nube)</option>
+                    </select>
+                </div>
+
+                <div id="fsFields">
+                    <label style="color: #00e676;">Ruta Local</label>
+                    <input type="text" name="path" value="/host/backups" required>
+                </div>
+
+                <div id="s3Fields" style="display:none;">
+                    <input type="text" name="endpoint" value="storage.googleapis.com" placeholder="Endpoint" style="margin-bottom:10px;">
+                    <input type="text" name="bucket" placeholder="Bucket" style="margin-bottom:10px;">
+                    <input type="text" name="access_key" placeholder="Access Key" style="margin-bottom:10px;">
+                    <input type="password" name="secret_key" placeholder="Secret Key" style="margin-bottom:10px;">
+                    <input type="text" name="region" placeholder="Region (us-east1)">
+                </div>
+
+                <div style="text-align: left; margin-top: 15px;">
+                    <label style="color: #00e676;">Contraseña Maestra</label>
+                    <input type="password" name="repo_password" placeholder="Tu contraseña" required>
+                </div>
+                <button type="submit" style="margin-top:20px;">Inicializar</button>
+            </form>
+        </div>
+
+        <div id="formRescue" style="display:none;">
+            <p style="color: #ff3d00; margin-bottom: 10px; font-weight:bold;">MODO RECUPERACIÓN (BARE-METAL)</p>
+            <p style="color: #aaa; font-size:0.85em; text-align:left; margin-bottom:20px; line-height: 1.4; border-left: 3px solid #ff3d00; padding-left: 10px;">
+                <strong style="color:white;">¡Atención!</strong> ShieldPi descargará tus backups desde la nube y <u>sobrescribirá los archivos en su ubicación original</u> (Ej: /var/lib/docker).
+            </p>
+
+            <form method="POST" action="/repo/rescue" onsubmit="document.getElementById('loadingOverlay').style.display='flex'">
+                
+                <div style="text-align: left;">
+                    <label style="color: #ff3d00;">1. Ruta para la Base de Datos (DB)</label>
+                    <p style="color: #666; font-size: 0.8em; margin: 0 0 5px 0;">Tus archivos irán a su origen. Aquí solo guardaremos la config interna.</p>
+                    <input type="text" name="local_path" value="/host/backups" placeholder="Ej: /host/backups" required style="border-color: #ff3d00;">
+                </div>
+
+                <div style="text-align: left; margin-top: 15px;">
+                    <label style="color: #ff3d00;">2. Credenciales de Nube (Origen)</label>
+                    <input type="text" name="endpoint" value="storage.googleapis.com" placeholder="Endpoint" style="margin-bottom:10px;">
+                    <input type="text" name="bucket" placeholder="Bucket donde está el backup" required style="margin-bottom:10px;">
+                    <input type="text" name="access_key" placeholder="Access Key ID" required style="margin-bottom:10px;">
+                    <input type="password" name="secret_key" placeholder="Secret Access Key" required style="margin-bottom:10px;">
+                    <input type="text" name="region" placeholder="Region (Ej: us-east1)" required>
+                </div>
+
+                <div style="text-align: left; margin-top: 15px;">
+                    <label style="color: #ff3d00;">3. Contraseña Maestra</label>
+                    <input type="password" name="repo_password" placeholder="La contraseña que usabas antes" required style="border-color: #ff3d00;">
+                </div>
+
+                <button type="submit" style="margin-top:20px; background-color: #ff3d00; border:none;">
+                    <i class="fas fa-download"></i> INICIAR RESCATE
+                </button>
+            </form>
+        </div>
+
+        <br>
+        <a href="/" class="logout-link">Volver</a>
     </div>
 
     <script>
-        let currentTargetInput = null;
-        let currentPath = '/host';
-        function openBrowser(inputId) { currentTargetInput = document.getElementById(inputId); document.getElementById('fileModal').style.display = 'block'; loadPath(currentPath); }
-        function closeBrowser() { document.getElementById('fileModal').style.display = 'none'; }
-        function loadPath(path) {
-            fetch('/api/browse', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({path: path}) })
-            .then(r => r.json()).then(data => {
-                currentPath = data.current; document.getElementById('currentPathDisplay').textContent = currentPath;
-                const list = document.getElementById('fileList'); list.innerHTML = '';
-                document.getElementById('btnUp').onclick = () => loadPath(data.parent);
-                data.items.forEach(item => { let li = document.createElement('li'); li.className = 'browser-item'; li.innerHTML = `<i class="fas fa-folder browser-icon"></i> ${item.name}`; li.onclick = () => loadPath(item.path); list.appendChild(li); });
-            });
+        function switchTab(mode) {
+            document.getElementById('tabNormal').classList.remove('active');
+            document.getElementById('tabRescue').classList.remove('active');
+            document.getElementById('formNormal').style.display = 'none';
+            document.getElementById('formRescue').style.display = 'none';
+
+            if(mode === 'normal') {
+                document.getElementById('tabNormal').classList.add('active');
+                document.getElementById('formNormal').style.display = 'block';
+            } else {
+                document.getElementById('tabRescue').classList.add('active');
+                document.getElementById('formRescue').style.display = 'block';
+            }
         }
-        function selectCurrentFolder() { if(currentTargetInput) currentTargetInput.value = currentPath; closeBrowser(); }
+
+        function toggleProvider() {
+            const val = document.getElementById('providerSelect').value;
+            document.getElementById('fsFields').style.display = val === 'filesystem' ? 'block' : 'none';
+            document.getElementById('s3Fields').style.display = val === 's3' ? 'block' : 'none';
+        }
     </script>
 </body>
 </html>
