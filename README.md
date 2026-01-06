@@ -18,7 +18,6 @@ ShieldPi is a robust tool built to protect your containers and critical files. I
 Copy this code into a file named `docker-compose.yml` to install:
 
 ```yaml
-version: '3.8'
 
 services:
   shieldpi:
@@ -28,7 +27,7 @@ services:
     ports:
       - 51515:51515
     environment:
-      - TZ=America/Santo_Domingo  # Adjust to your Timezone
+      - TZ=  # Adjust to your Timezone
     volumes:
       # Settings and Database
       - ./shieldpi_data:/app/config
