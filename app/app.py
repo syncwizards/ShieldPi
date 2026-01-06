@@ -182,11 +182,15 @@ def scheduler_loop():
                         success, _, err = run_kopia(['snapshot', 'create'] + paths)
                         if success: 
                             set_setting('last_run_date', today_str)
+                            
+                            # Mantenimiento para aplicar retención
+                            run_kopia(['maintenance', 'run', '--full'])
+                            
                             sync_msg = ""
                             cloud_cfg = get_cloud_config()
                             if cloud_cfg:
                                 print("--- Auto Sync Nube ---", flush=True)
-                                cmd_sync = ['repository', 'sync-to', 's3', '--bucket', cloud_cfg['bucket'], '--access-key', cloud_cfg['access_key'], '--secret-access-key', cloud_cfg['secret_key']]
+                                cmd_sync = ['repository', 'sync-to', 's3', '--delete', '--bucket', cloud_cfg['bucket'], '--access-key', cloud_cfg['access_key'], '--secret-access-key', cloud_cfg['secret_key']]
                                 if cloud_cfg['endpoint']: cmd_sync.extend(['--endpoint', cloud_cfg['endpoint']])
                                 if cloud_cfg['region']: cmd_sync.extend(['--region', cloud_cfg['region']])
                                 s_sync, _, err_sync = run_kopia(cmd_sync)
@@ -231,7 +235,8 @@ def settings_cloud(): set_cloud_config('s3', request.form.get('bucket'), request
 def sync_run():
     cfg = get_cloud_config()
     if not cfg: flash("Configura la nube primero."); return redirect(url_for('home'))
-    cmd = ['repository', 'sync-to', 's3', '--bucket', cfg['bucket'], '--access-key', cfg['access_key'], '--secret-access-key', cfg['secret_key']]
+    # Sincronización manual con borrado espejo
+    cmd = ['repository', 'sync-to', 's3', '--delete', '--bucket', cfg['bucket'], '--access-key', cfg['access_key'], '--secret-access-key', cfg['secret_key']]
     if cfg['endpoint']: cmd.extend(['--endpoint', cfg['endpoint']])
     if cfg['region']: cmd.extend(['--region', cfg['region']])
     success, _, err = run_kopia(cmd)
@@ -301,10 +306,14 @@ def backup_run():
     success, _, err = run_kopia(['snapshot', 'create'] + p)
     if success:
         flash_msg = "Backup Local Exitoso."
+        
+        # Mantenimiento completo para borrar snapshots viejos
+        run_kopia(['maintenance', 'run', '--full'])
+        
         cloud_cfg = get_cloud_config()
         if cloud_cfg:
             print("--- Auto Sync tras Backup Manual ---", flush=True)
-            cmd_sync = ['repository', 'sync-to', 's3', '--bucket', cloud_cfg['bucket'], '--access-key', cloud_cfg['access_key'], '--secret-access-key', cloud_cfg['secret_key']]
+            cmd_sync = ['repository', 'sync-to', 's3', '--delete', '--bucket', cloud_cfg['bucket'], '--access-key', cloud_cfg['access_key'], '--secret-access-key', cloud_cfg['secret_key']]
             if cloud_cfg['endpoint']: cmd_sync.extend(['--endpoint', cloud_cfg['endpoint']])
             if cloud_cfg['region']: cmd_sync.extend(['--region', cloud_cfg['region']])
             s_sync, _, err_sync = run_kopia(cmd_sync)
