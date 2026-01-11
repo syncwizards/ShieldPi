@@ -183,7 +183,7 @@ def scheduler_loop():
                         if success: 
                             set_setting('last_run_date', today_str)
                             
-                            # Mantenimiento para aplicar retención
+                            # Mantenimiento para aplicar retencion
                             run_kopia(['maintenance', 'run', '--full'])
                             
                             sync_msg = ""
@@ -235,19 +235,44 @@ def settings_cloud(): set_cloud_config('s3', request.form.get('bucket'), request
 def sync_run():
     cfg = get_cloud_config()
     if not cfg: flash("Configura la nube primero."); return redirect(url_for('home'))
-    # Sincronización manual con borrado espejo
+    # Sincronizacion manual con borrado espejo
     cmd = ['repository', 'sync-to', 's3', '--delete', '--bucket', cfg['bucket'], '--access-key', cfg['access_key'], '--secret-access-key', cfg['secret_key']]
     if cfg['endpoint']: cmd.extend(['--endpoint', cfg['endpoint']])
     if cfg['region']: cmd.extend(['--region', cfg['region']])
     success, _, err = run_kopia(cmd)
-    if success: send_notification("Sync Nube Manual OK."); flash("Sincronización OK.")
+    if success: send_notification("Sync Nube Manual OK."); flash("Sincronizacion OK.")
     else: print(f"Sync Error: {err}", flush=True); send_notification(f"Sync Error: {err}", False); flash(f"Error: {err}")
     return redirect(url_for('home'))
 
 @app.route('/api/test_notification')
 def test_notification(): return "OK" if send_notification("Test ShieldPi") else "Error"
+
+# --- MODIFICACION: CORRECCION DE RETENCION ---
 @app.route('/settings/retention', methods=['POST'])
-def settings_retention(): v=request.form.get('keep_latest'); run_kopia(['policy', 'set', '--global', '--keep-latest', v]); set_setting('retention', v); return redirect(url_for('home'))
+def settings_retention(): 
+    v = request.form.get('keep_latest')
+    if not v: v = "1"
+    
+    # 1. Aplicar politicas estrictas (0 en todo excepto keep-latest)
+    run_kopia([
+        'policy', 'set', '--global', 
+        '--keep-latest', v, 
+        '--keep-hourly', '0', 
+        '--keep-daily', '0', 
+        '--keep-weekly', '0', 
+        '--keep-monthly', '0', 
+        '--keep-annual', '0'
+    ])
+    
+    # 2. Guardar en base de datos local
+    set_setting('retention', v)
+    
+    # 3. Forzar mantenimiento inmediato para limpiar archivos viejos
+    run_kopia(['maintenance', 'run', '--full'])
+    
+    return redirect(url_for('home'))
+# ---------------------------------------------
+
 @app.route('/schedule/update', methods=['POST'])
 def schedule_update(): set_setting('freq', request.form.get('frequency')); set_setting('time', request.form.get('time')); return redirect(url_for('home'))
 @app.route('/api/docker/list', methods=['GET'])
@@ -318,12 +343,12 @@ def backup_run():
             if cloud_cfg['region']: cmd_sync.extend(['--region', cloud_cfg['region']])
             s_sync, _, err_sync = run_kopia(cmd_sync)
             if s_sync:
-                flash_msg += " Y Sincronización a Nube Completada."
+                flash_msg += " Y Sincronizacion a Nube Completada."
                 send_notification("Backup Manual + Sync Nube Exitoso")
             else:
-                flash_msg += f" Pero falló la Nube: {err_sync}"
+                flash_msg += f" Pero fallo la Nube: {err_sync}"
                 print(f"Error Sync Manual: {err_sync}", flush=True)
-                send_notification(f"Sync Nube falló: {err_sync}", False)
+                send_notification(f"Sync Nube fallo: {err_sync}", False)
         else: send_notification("Backup Manual Local Exitoso")
         flash(flash_msg)
     else:
@@ -421,13 +446,13 @@ def repo_rescue():
         
         if s:
             set_cloud_config('s3', bucket, access, secret, endpoint, region)
-            flash(f"¡Rescate Exitoso! Se restauraron {restored_count} rutas en su ubicación original.")
+            flash(f"Rescate Exitoso! Se restauraron {restored_count} rutas en su ubicacion original.")
             return redirect(url_for('home'))
         else:
-            flash(f"Datos restaurados, pero falló config local: {e}")
+            flash(f"Datos restaurados, pero fallo config local: {e}")
             return redirect(url_for('repo_setup'))
     else:
-        flash("No se encontraron snapshots válidos.")
+        flash("No se encontraron snapshots validos.")
         return redirect(url_for('repo_setup'))
 
 if __name__ == '__main__': app.run(host='0.0.0.0', port=51515)
